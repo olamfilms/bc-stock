@@ -1,9 +1,11 @@
 import { Resend } from 'resend'
 import type { QuoteFormData, Media } from '@/types'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY)
+}
 
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'quotes@bcstock.ca'
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'video@olamfilms.com'
 const TO_EMAIL = process.env.RESEND_TO_EMAIL || 'video@olamfilms.com'
 
 function formatMediaList(mediaItems: Media[]): string {
@@ -132,6 +134,8 @@ export async function sendQuoteEmail(
   data: QuoteFormData,
   mediaItems: Media[]
 ): Promise<void> {
+  const resend = getResend()
+
   // Send notification to admin
   await resend.emails.send({
     from: FROM_EMAIL,
