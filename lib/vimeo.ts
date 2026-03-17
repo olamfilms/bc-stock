@@ -38,6 +38,7 @@ export async function fetchVimeoMetadata(vimeoId: string): Promise<VimeoMetadata
 
   if (!response.ok) {
     const errorText = await response.text()
+    console.error(`Vimeo API error for ID ${vimeoId}: status=${response.status}, url=${response.url}, body=${errorText}`)
     throw new Error(`Vimeo API error ${response.status}: ${errorText}`)
   }
 
