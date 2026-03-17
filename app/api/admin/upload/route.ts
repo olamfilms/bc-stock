@@ -76,6 +76,7 @@ export async function POST(request: NextRequest) {
           }
 
           // Fetch Vimeo metadata if we have a Vimeo ID
+          let vimeoError: string | undefined
           if (vimeoId) {
             try {
               const vimeoData = await fetchVimeoMetadata(vimeoId)
@@ -84,8 +85,8 @@ export async function POST(request: NextRequest) {
               duration = vimeoData.duration
               thumbnail = vimeoData.thumbnail
             } catch (vimeoErr) {
+              vimeoError = vimeoErr instanceof Error ? vimeoErr.message : 'Vimeo fetch failed'
               console.warn(`Vimeo fetch failed for ${vimeoId}:`, vimeoErr)
-              // Continue without Vimeo data
             }
           }
 
@@ -133,6 +134,7 @@ export async function POST(request: NextRequest) {
             thumbnail,
             tags,
             aiEnriched,
+            error: vimeoError,
           }
 
           allRows.push(enrichedRow)
