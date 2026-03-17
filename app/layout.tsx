@@ -12,6 +12,10 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
+  icons: {
+    icon: '/favicon.png',
+    apple: '/favicon.png',
+  },
   title: 'BC Stock | British Columbia Stock Footage & Photos',
   description:
     'Premium British Columbia stock footage and photography. License cinematic 4K clips and stunning photos from Vancouver Island, the BC Interior, the Wild Coast, and beyond.',
