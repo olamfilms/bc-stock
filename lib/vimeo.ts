@@ -29,7 +29,7 @@ export async function fetchVimeoMetadata(vimeoId: string): Promise<VimeoMetadata
     throw new Error('VIMEO_ACCESS_TOKEN is not set')
   }
 
-  const response = await fetch(`https://api.vimeo.com/videos/${vimeoId}`, {
+  const response = await fetch(`https://api.vimeo.com/me/videos/${vimeoId}`, {
     headers: {
       Authorization: `bearer ${token}`,
       Accept: 'application/vnd.vimeo.*+json;version=3.4',
