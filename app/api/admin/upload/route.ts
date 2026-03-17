@@ -75,19 +75,10 @@ export async function POST(request: NextRequest) {
             if (!isNaN(parsed)) duration = parsed
           }
 
-          // Fetch Vimeo metadata if we have a Vimeo ID
-          let vimeoError: string | undefined
+          // Fetch Vimeo thumbnail (no API key required via vumbnail.com)
           if (vimeoId) {
-            try {
-              const vimeoData = await fetchVimeoMetadata(vimeoId)
-              // Use Vimeo title if CSV title is missing
-              if (!title) title = vimeoData.title
-              duration = vimeoData.duration
-              thumbnail = vimeoData.thumbnail
-            } catch (vimeoErr) {
-              vimeoError = vimeoErr instanceof Error ? vimeoErr.message : 'Vimeo fetch failed'
-              console.warn(`Vimeo fetch failed for ${vimeoId}:`, vimeoErr)
-            }
+            const vimeoData = await fetchVimeoMetadata(vimeoId)
+            thumbnail = vimeoData.thumbnail
           }
 
           // Determine whether to run Claude enrichment
@@ -134,7 +125,7 @@ export async function POST(request: NextRequest) {
             thumbnail,
             tags,
             aiEnriched,
-            error: vimeoError,
+            error: undefined,
           }
 
           allRows.push(enrichedRow)
