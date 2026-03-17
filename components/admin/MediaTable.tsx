@@ -4,6 +4,8 @@ import { useState } from 'react'
 import Image from 'next/image'
 import type { Media } from '@/types'
 
+const ALL_CATEGORIES = ['Featured', 'Wildlife', 'Indigenous', 'Aerial', 'Coastal', 'Interior', 'Industry', 'Salmon', 'Urban', 'Rivers & Streams', 'Mountains']
+
 function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60)
   const s = seconds % 60
@@ -14,12 +16,82 @@ interface MediaTableProps {
   initialMedia: Media[]
 }
 
+interface EditState {
+  id: string
+  title: string
+  description: string
+  thumbnail: string
+  categories: string[]
+}
+
 export default function MediaTable({ initialMedia }: MediaTableProps) {
   const [media, setMedia] = useState<Media[]>(initialMedia)
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | 'video' | 'photo'>('all')
   const [updating, setUpdating] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [editItem, setEditItem] = useState<EditState | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  function openEdit(item: Media) {
+    setEditItem({
+      id: item.id,
+      title: item.title,
+      description: item.description || '',
+      thumbnail: item.vimeo_thumbnail || item.cloudinary_url || '',
+      categories: (item.categories || []).map((c) => c.name),
+    })
+  }
+
+  function toggleEditCategory(cat: string) {
+    if (!editItem) return
+    setEditItem({
+      ...editItem,
+      categories: editItem.categories.includes(cat)
+        ? editItem.categories.filter((c) => c !== cat)
+        : [...editItem.categories, cat],
+    })
+  }
+
+  async function saveEdit() {
+    if (!editItem) return
+    setSaving(true)
+    try {
+      const item = media.find((m) => m.id === editItem.id)
+      const thumbnailField = item?.type === 'video' ? 'vimeo_thumbnail' : 'cloudinary_url'
+      const res = await fetch(`/api/media/${editItem.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editItem.title,
+          description: editItem.description,
+          [thumbnailField]: editItem.thumbnail,
+          category_names: editItem.categories,
+        }),
+      })
+      if (res.ok) {
+        setMedia((prev) =>
+          prev.map((m) =>
+            m.id === editItem.id
+              ? {
+                  ...m,
+                  title: editItem.title,
+                  description: editItem.description,
+                  vimeo_thumbnail: item?.type === 'video' ? editItem.thumbnail : m.vimeo_thumbnail,
+                  cloudinary_url: item?.type === 'photo' ? editItem.thumbnail : m.cloudinary_url,
+                  categories: editItem.categories.map((name) => ({ id: name, name, slug: name.toLowerCase(), sort_order: 0, created_at: '' })),
+                }
+              : m
+          )
+        )
+        setEditItem(null)
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const filtered = media.filter((item) => {
     const matchesSearch = item.title.toLowerCase().includes(search.toLowerCase())
@@ -264,20 +336,33 @@ export default function MediaTable({ initialMedia }: MediaTableProps) {
                     </button>
                   </td>
 
-                  {/* Delete */}
+                  {/* Actions */}
                   <td className="px-4 py-3 text-center">
-                    <button
-                      onClick={() => deleteItem(item.id, item.title)}
-                      disabled={deleting === item.id}
-                      className="p-1.5 rounded transition-colors"
-                      style={{ color: '#6e7681' }}
-                      title="Delete"
-                    >
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
-                        <polyline points="3 6 5 6 21 6"/>
-                        <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
-                      </svg>
-                    </button>
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => openEdit(item)}
+                        className="p-1.5 rounded transition-colors"
+                        style={{ color: '#5aab80' }}
+                        title="Edit"
+                      >
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                          <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                          <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => deleteItem(item.id, item.title)}
+                        disabled={deleting === item.id}
+                        className="p-1.5 rounded transition-colors"
+                        style={{ color: '#6e7681' }}
+                        title="Delete"
+                      >
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                          <polyline points="3 6 5 6 21 6"/>
+                          <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
+                        </svg>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -294,6 +379,104 @@ export default function MediaTable({ initialMedia }: MediaTableProps) {
           )}
         </div>
       </div>
+
+      {/* Edit Modal */}
+      {editItem && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setEditItem(null) }}
+        >
+          <div
+            className="w-full max-w-lg rounded-xl flex flex-col gap-5 p-6"
+            style={{ backgroundColor: '#161b22', border: '1px solid #30363d', maxHeight: '90vh', overflowY: 'auto' }}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold" style={{ color: '#e6edf3' }}>Edit Media</h2>
+              <button onClick={() => setEditItem(null)} style={{ color: '#8b949e' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+
+            {/* Title */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium uppercase tracking-wider" style={{ color: '#8b949e' }}>Title</label>
+              <input
+                type="text"
+                value={editItem.title}
+                onChange={(e) => setEditItem({ ...editItem, title: e.target.value })}
+                className="form-input"
+              />
+            </div>
+
+            {/* Description */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium uppercase tracking-wider" style={{ color: '#8b949e' }}>Description</label>
+              <textarea
+                value={editItem.description}
+                onChange={(e) => setEditItem({ ...editItem, description: e.target.value })}
+                className="form-input"
+                rows={3}
+              />
+            </div>
+
+            {/* Thumbnail URL */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium uppercase tracking-wider" style={{ color: '#8b949e' }}>Thumbnail URL</label>
+              <input
+                type="text"
+                value={editItem.thumbnail}
+                onChange={(e) => setEditItem({ ...editItem, thumbnail: e.target.value })}
+                className="form-input"
+                placeholder="https://..."
+              />
+              {editItem.thumbnail && (
+                <img src={editItem.thumbnail} alt="preview" className="rounded mt-1" style={{ height: 80, objectFit: 'cover' }} />
+              )}
+            </div>
+
+            {/* Categories */}
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-medium uppercase tracking-wider" style={{ color: '#8b949e' }}>Categories</label>
+              <div className="flex flex-wrap gap-2">
+                {ALL_CATEGORIES.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => toggleEditCategory(cat)}
+                    className="px-2.5 py-1 rounded-full text-xs font-medium transition-colors"
+                    style={{
+                      backgroundColor: editItem.categories.includes(cat) ? 'rgba(61,122,92,0.3)' : '#1c2128',
+                      color: editItem.categories.includes(cat) ? '#5aab80' : '#8b949e',
+                      border: `1px solid ${editItem.categories.includes(cat) ? 'rgba(90,171,128,0.4)' : '#30363d'}`,
+                    }}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={saveEdit}
+                disabled={saving}
+                className="btn-primary flex-1 justify-center"
+              >
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+              <button
+                onClick={() => setEditItem(null)}
+                className="btn-outline"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

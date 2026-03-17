@@ -58,7 +58,7 @@ export async function PATCH(
     const body = await request.json()
 
     // Handle category updates separately if provided
-    const { categoryIds, ...mediaFields } = body
+    const { categoryIds, category_names, ...mediaFields } = body
 
     if (Object.keys(mediaFields).length > 0) {
       const { error } = await supabaseServer
@@ -71,12 +71,30 @@ export async function PATCH(
       }
     }
 
-    if (Array.isArray(categoryIds)) {
+    // Resolve category_names to IDs if provided
+    let resolvedCategoryIds: string[] | null = Array.isArray(categoryIds) ? categoryIds : null
+
+    if (Array.isArray(category_names)) {
+      if (category_names.length > 0) {
+        const { data: cats, error: catLookupErr } = await supabaseServer
+          .from('categories')
+          .select('id, name')
+          .in('name', category_names)
+        if (catLookupErr) {
+          return NextResponse.json({ error: catLookupErr.message }, { status: 500 })
+        }
+        resolvedCategoryIds = (cats || []).map((c: { id: string }) => c.id)
+      } else {
+        resolvedCategoryIds = []
+      }
+    }
+
+    if (resolvedCategoryIds !== null) {
       // Replace all category associations
       await supabaseServer.from('media_categories').delete().eq('media_id', id)
 
-      if (categoryIds.length > 0) {
-        const insertData = categoryIds.map((catId: string) => ({
+      if (resolvedCategoryIds.length > 0) {
+        const insertData = resolvedCategoryIds.map((catId: string) => ({
           media_id: id,
           category_id: catId,
         }))
