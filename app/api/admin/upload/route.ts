@@ -69,10 +69,20 @@ export async function POST(request: NextRequest) {
           let thumbnail: string | null = null
           const shotOn = (row.shotOn || '').trim()
 
-          // Parse duration from CSV if provided
+          // Parse duration from CSV if provided (supports "1:23" or plain seconds)
           if (row.duration) {
-            const parsed = parseInt(String(row.duration), 10)
-            if (!isNaN(parsed)) duration = parsed
+            const durStr = String(row.duration).trim()
+            if (durStr.includes(':')) {
+              const parts = durStr.split(':')
+              const minutes = parseInt(parts[0], 10)
+              const seconds = parseInt(parts[1], 10)
+              if (!isNaN(minutes) && !isNaN(seconds)) {
+                duration = minutes * 60 + seconds
+              }
+            } else {
+              const parsed = parseInt(durStr, 10)
+              if (!isNaN(parsed)) duration = parsed
+            }
           }
 
           // Fetch Vimeo thumbnail (no API key required via vumbnail.com)
