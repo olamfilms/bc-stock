@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
       ? `Location/context from photographer: "${notes.trim()}". `
       : ''
 
-    const prompt = `You are helping catalog BC (British Columbia, Canada) stock photography for licensing. Analyze this photo. ${notesLine}Generate catalog metadata. Available categories: ${AVAILABLE_CATEGORIES.join(', ')}. Respond with ONLY valid JSON: { "title": "...", "description": "two polished sentences for stock licensing", "suggestedCategories": ["Category1"], "tags": ["tag1","tag2","tag3","tag4","tag5"] }`
+    const prompt = `You are helping catalog BC (British Columbia, Canada) stock photography for licensing. Analyze this photo. ${notesLine}Generate catalog metadata. Available categories: ${AVAILABLE_CATEGORIES.join(', ')}. Respond with ONLY valid JSON: { "title": "short plain 3-5 word title, no marketing language (e.g. 'Bald Eagle in Flight', 'Coastal Fog at Dusk')", "description": "one concise factual sentence describing what is in the photo, no flowery or AI-sounding language", "suggestedCategories": ["Category1"], "tags": ["tag1","tag2","tag3","tag4","tag5"] }`
 
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
