@@ -74,33 +74,65 @@ export default function PhotoUploader({ onComplete }: PhotoUploaderProps) {
 
     const results: EnrichedPhotoRow[] = []
 
+    // Get a Cloudinary signature once for the whole batch
+    let signData: { timestamp: number; signature: string; apiKey: string; cloudName: string; folder: string }
+    try {
+      const signRes = await fetch('/api/admin/cloudinary-sign', { method: 'POST' })
+      if (!signRes.ok) throw new Error('Failed to get upload signature')
+      signData = await signRes.json()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to get upload signature')
+      setProcessing(false)
+      return
+    }
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
       setProgress({ current: i + 1, total: files.length, filename: file.name })
 
       try {
-        const formData = new FormData()
-        formData.append('file', file)
-        formData.append('notes', notes)
+        // Step 1: Upload directly from browser to Cloudinary
+        const cloudinaryForm = new FormData()
+        cloudinaryForm.append('file', file)
+        cloudinaryForm.append('api_key', signData.apiKey)
+        cloudinaryForm.append('timestamp', String(signData.timestamp))
+        cloudinaryForm.append('signature', signData.signature)
+        cloudinaryForm.append('folder', signData.folder)
 
-        const res = await fetch('/api/admin/upload-photo', {
+        const cloudinaryRes = await fetch(
+          `https://api.cloudinary.com/v1_1/${signData.cloudName}/image/upload`,
+          { method: 'POST', body: cloudinaryForm }
+        )
+
+        if (!cloudinaryRes.ok) {
+          const errText = await cloudinaryRes.text()
+          throw new Error(`Cloudinary upload failed: ${errText}`)
+        }
+
+        const cloudinaryData = await cloudinaryRes.json()
+        const publicId: string = cloudinaryData.public_id
+        const cloudinaryUrl: string = cloudinaryData.secure_url
+
+        // Step 2: Send URL to server for Claude analysis
+        const analyzeRes = await fetch('/api/admin/upload-photo', {
           method: 'POST',
-          body: formData,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cloudinaryUrl, publicId, notes, filename: file.name }),
         })
 
-        const data = await res.json()
+        const data = await analyzeRes.json()
 
-        if (!res.ok || data.error) {
+        if (!analyzeRes.ok || data.error) {
           results.push({
             filename: file.name,
             title: file.name.replace(/\.[^.]+$/, ''),
             description: '',
-            cloudinaryId: '',
-            cloudinaryUrl: '',
+            cloudinaryId: publicId,
+            cloudinaryUrl,
             categories: [],
             tags: [],
             aiEnriched: false,
-            error: data.error || `HTTP ${res.status}`,
+            error: data.error || `HTTP ${analyzeRes.status}`,
           })
         } else {
           results.push({
@@ -395,7 +427,7 @@ export default function PhotoUploader({ onComplete }: PhotoUploaderProps) {
           </div>
 
           <p className="text-xs mt-3" style={{ color: '#6e7681' }}>
-            Uploading to Cloudinary and analyzing with Claude — please wait
+            Uploading to Cloudinary and analyzing with AI — please wait
           </p>
         </div>
       )}

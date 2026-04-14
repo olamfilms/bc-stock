@@ -1,15 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import crypto from 'crypto'
 import Anthropic from '@anthropic-ai/sdk'
 import { verifyAdminToken, COOKIE_NAME } from '@/lib/admin-auth'
-
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '20mb',
-    },
-  },
-}
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -30,80 +21,23 @@ const AVAILABLE_CATEGORIES = [
 ]
 
 export async function POST(request: NextRequest) {
-  // Auth check
   const token = request.cookies.get(COOKIE_NAME)?.value
   if (!token || !(await verifyAdminToken(token))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   try {
-    const formData = await request.formData()
-    const file = formData.get('file') as File | null
-    const notes = (formData.get('notes') as string) || ''
+    const body = await request.json()
+    const { cloudinaryUrl, publicId, notes, filename } = body
 
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 })
-    }
-
-    // ---- Step 1: Upload to Cloudinary ----
-    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
-    const apiKey = process.env.CLOUDINARY_API_KEY
-    const apiSecret = process.env.CLOUDINARY_API_SECRET
-
-    if (!cloudName || !apiKey || !apiSecret) {
+    if (!cloudinaryUrl || !publicId) {
       return NextResponse.json(
-        { error: 'Cloudinary environment variables not configured' },
-        { status: 500 }
+        { error: 'cloudinaryUrl and publicId are required' },
+        { status: 400 }
       )
     }
 
-    const timestamp = Math.floor(Date.now() / 1000)
-    const folder = 'bc-stock'
-
-    // Signature: SHA1 of "folder=bc-stock&timestamp=<ts><secret>"
-    const signatureString = `folder=${folder}&timestamp=${timestamp}${apiSecret}`
-    const signature = crypto
-      .createHash('sha1')
-      .update(signatureString)
-      .digest('hex')
-
-    // Build multipart body for Cloudinary
-    const cloudinaryForm = new FormData()
-    cloudinaryForm.append('file', file)
-    cloudinaryForm.append('api_key', apiKey)
-    cloudinaryForm.append('timestamp', String(timestamp))
-    cloudinaryForm.append('signature', signature)
-    cloudinaryForm.append('folder', folder)
-
-    const cloudinaryRes = await fetch(
-      `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-      {
-        method: 'POST',
-        body: cloudinaryForm,
-      }
-    )
-
-    if (!cloudinaryRes.ok) {
-      const errText = await cloudinaryRes.text()
-      return NextResponse.json(
-        { error: `Cloudinary upload failed: ${errText}` },
-        { status: 500 }
-      )
-    }
-
-    const cloudinaryData = await cloudinaryRes.json()
-    const publicId: string = cloudinaryData.public_id
-    const secureUrl: string = cloudinaryData.secure_url
-
-    if (!publicId || !secureUrl) {
-      return NextResponse.json(
-        { error: 'Cloudinary response missing public_id or secure_url' },
-        { status: 500 }
-      )
-    }
-
-    // ---- Step 2: Claude vision analysis ----
-    const notesLine = notes.trim()
+    const notesLine = (notes || '').trim()
       ? `Location/context from photographer: "${notes.trim()}". `
       : ''
 
@@ -118,10 +52,7 @@ export async function POST(request: NextRequest) {
           content: [
             {
               type: 'image',
-              source: {
-                type: 'url',
-                url: secureUrl,
-              },
+              source: { type: 'url', url: cloudinaryUrl },
             },
             {
               type: 'text',
@@ -140,7 +71,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Extract JSON — handle any surrounding text or code fences
     let parsed: {
       title?: string
       description?: string
@@ -150,9 +80,7 @@ export async function POST(request: NextRequest) {
 
     try {
       const jsonMatch = content.text.match(/\{[\s\S]*\}/)
-      if (!jsonMatch) {
-        throw new Error('No JSON found in Claude response')
-      }
+      if (!jsonMatch) throw new Error('No JSON found in Claude response')
       parsed = JSON.parse(jsonMatch[0])
     } catch {
       return NextResponse.json(
@@ -161,11 +89,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Sanitize
+    const baseName = (filename as string | undefined)?.replace(/\.[^.]+$/, '') ?? publicId
     const title =
       typeof parsed.title === 'string' && parsed.title.trim()
         ? parsed.title.trim()
-        : file.name.replace(/\.[^.]+$/, '')
+        : baseName
 
     const description =
       typeof parsed.description === 'string' && parsed.description.trim()
@@ -173,9 +101,7 @@ export async function POST(request: NextRequest) {
         : ''
 
     const suggestedCategories = Array.isArray(parsed.suggestedCategories)
-      ? parsed.suggestedCategories.filter((c) =>
-          AVAILABLE_CATEGORIES.includes(c)
-        )
+      ? parsed.suggestedCategories.filter((c) => AVAILABLE_CATEGORIES.includes(c))
       : []
 
     const tags = Array.isArray(parsed.tags)
@@ -184,7 +110,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       publicId,
-      cloudinaryUrl: secureUrl,
+      cloudinaryUrl,
       title,
       description,
       suggestedCategories,
