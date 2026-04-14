@@ -3,6 +3,14 @@ import crypto from 'crypto'
 import Anthropic from '@anthropic-ai/sdk'
 import { verifyAdminToken, COOKIE_NAME } from '@/lib/admin-auth'
 
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '20mb',
+    },
+  },
+}
+
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })

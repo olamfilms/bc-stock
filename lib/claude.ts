@@ -49,13 +49,13 @@ ${AVAILABLE_CATEGORIES.join(', ')}
 
 Please return a JSON object with exactly these fields:
 {
-  "description": "A polished 2-sentence description suitable for a stock licensing catalog. Focus on what is visually depicted, the mood, and potential licensing uses. Be specific and evocative.",
+  "description": "One concise factual sentence describing what is shown in the clip. No marketing language, no flowery adjectives, no AI-sounding phrases.",
   "suggestedCategories": ["Category1", "Category2"],
   "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"]
 }
 
 Requirements:
-- description: Exactly 2 sentences. Professional stock licensing tone. Mention BC or British Columbia if relevant. Include visual details and mood.
+- description: One sentence. Factual and plain. Describe what is literally visible, no mood or marketing language.
 - suggestedCategories: 1–3 categories chosen ONLY from the available list above. Must be exact matches.
 - tags: 5–8 lowercase keyword tags relevant to the content (e.g. "british columbia", "wildlife", "4k", "nature", "aerial")
 
