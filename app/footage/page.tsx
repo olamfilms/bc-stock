@@ -1,13 +1,13 @@
 import FootageClientShell from '@/components/media/FootageClientShell'
+import { supabaseServer } from '@/lib/supabase/server'
 
 async function getCategories() {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
-    const res = await fetch(`${baseUrl}/api/categories`, {
-      next: { revalidate: 3600 },
-    })
-    if (!res.ok) return []
-    return res.json()
+    const { data } = await supabaseServer
+      .from('categories')
+      .select('*')
+      .order('sort_order', { ascending: true })
+    return data || []
   } catch {
     return []
   }
