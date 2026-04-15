@@ -47,7 +47,7 @@ export default async function PhotosPage({ searchParams }: PhotosPageProps) {
 
         <PhotosClientShell
           categories={categories}
-          initialCategory={category || 'all'}
+          initialCategory={category || 'featured'}
         />
       </div>
     </main>

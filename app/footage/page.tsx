@@ -47,7 +47,7 @@ export default async function FootagePage({ searchParams }: FootagePageProps) {
 
         <FootageClientShell
           categories={categories}
-          initialCategory={category || 'all'}
+          initialCategory={category || 'featured'}
         />
       </div>
     </main>
